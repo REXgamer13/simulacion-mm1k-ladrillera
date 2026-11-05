@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación M/M/1/K — Ladrillera Los Vados S.A.S.</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+
+<!-- ============================== HEADER ============================== -->
+<header class="header">
+    <div class="header-logo">
+        <span class="logo-icon">🧱</span>
+        <div>
+            <div>Simulación M/M/1/K — Ladrillera Los Vados S.A.S.</div>
+            <div class="header-subtitle">Juan Sebastian Gelvez Botia — Ing. de Sistemas — UDES Cúcuta — Modelos Matemáticos 2026</div>
+        </div>
+    </div>
+    <ul class="nav-tabs">
+        <li><button class="nav-tab active" data-view="vista1">🏗️ Simulación 3D</button></li>
+        <li><button class="nav-tab" data-view="vista2">📊 Dashboard M/M/1/K</button></li>
+        <li><button class="nav-tab" data-view="vista3">📝 Instrumento de Datos</button></li>
+        <li><button class="nav-tab" data-view="vista4">📐 Fórmulas del Código</button></li>
+    </ul>
+</header>
+
+<!-- ========================= VISTA 1: SIMULACIÓN 3D ========================= -->
+<div id="vista1" class="view-container active">
+    <div class="sim3d-layout">
+        <!-- Controles superiores -->
+        <div class="sim3d-controls">
+            <div class="control-group">
+                <button id="btn-start" class="btn btn-success">▶ Iniciar</button>
+                <button id="btn-pause" class="btn btn-warning" disabled>⏸ Pausar</button>
+                <button id="btn-reset" class="btn btn-secondary">⟲ Reiniciar</button>
+            </div>
+            <div class="control-separator"></div>
+            <div class="control-group">
+                <span class="control-label">Velocidad:</span>
+                <button class="speed-btn active" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="5">5x</button>
+                <button class="speed-btn" data-speed="15">15x</button>
+                <button class="speed-btn" data-speed="30">30x</button>
+                <button class="speed-btn" data-speed="60">60x</button>
+            </div>
+            <div class="control-separator"></div>
+            <div class="control-group">
+                <span class="control-label">Cargueros (m):</span>
+                <select id="sim-cargueros" class="form-select">
+                    <option value="2">2</option>
+                    <option value="3" selected>3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Capacidad K:</span>
+                <select id="sim-capacidad" class="form-select">
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6" selected>6</option>
+                    <option value="8">8</option>
+                    <option value="10">10</option>
+                    <option value="12">12</option>
+                </select>
+            </div>
+            <div class="control-separator"></div>
+            <div class="control-group">
+                <span class="control-label">Cámara:</span>
+                <button id="cam-perspective" class="btn btn-info btn-sm">🎥 Perspectiva 3D</button>
+                <button id="cam-ortho" class="btn btn-info btn-sm">🗺️ Vista Superior</button>
+                <button id="cam-loading" class="btn btn-info btn-sm">🔍 Zona de Cargue</button>
+            </div>
+        </div>
+
+        <!-- Canvas 3D -->
+        <div class="sim3d-canvas-wrapper">
+            <div id="canvas3d" style="width:100%;height:100%;"></div>
+            <!-- HUD Overlay -->
+            <div class="hud-overlay">
+                <div class="hud-clock" id="hud-time">6:00 a.m.</div>
+                <div class="hud-status" id="hud-estado">⏳ Esperando inicio</div>
+                <hr style="border-color:rgba(255,255,255,0.15); margin:0.4rem 0">
+                <div class="hud-stat"><span class="hud-stat-label">Atendidos:</span><span class="hud-stat-value" id="hud-atendidos">0</span></div>
+                <div class="hud-stat"><span class="hud-stat-label">Bloqueados:</span><span class="hud-stat-value" id="hud-bloqueados">0</span></div>
+                <div class="hud-stat"><span class="hud-stat-label">En sistema:</span><span class="hud-stat-value" id="hud-en-sistema">0</span></div>
+                <div class="hud-stat"><span class="hud-stat-label">En cola:</span><span class="hud-stat-value" id="hud-en-cola">0</span></div>
+                <div class="hud-stat"><span class="hud-stat-label">Servidor:</span><span class="hud-stat-value" id="hud-servidor">Libre</span></div>
+            </div>
+            <!-- Aviso de Almuerzo -->
+            <div class="lunch-overlay" id="lunch-overlay">
+                🍽️ PAUSA DE ALMUERZO<br>
+                <small>12:00 p.m. - 1:00 p.m.</small>
+            </div>
+            <!-- Gate Info Panel -->
+            <div class="gate-info-panel" id="gate-info">
+                <h4>📋 Registro Portería</h4>
+                <div id="gate-info-content"></div>
+            </div>
+        </div>
+
+        <!-- Sidebar: Bitácora en vivo -->
+        <div class="sim3d-sidebar">
+            <div class="panel log-panel">
+                <div class="panel-header">📋 Bitácora en Vivo</div>
+                <div class="panel-body" style="padding:0;">
+                    <div class="table-wrapper" style="max-height:calc(100vh - 200px);overflow-y:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>Camión</th>
+                                    <th>Tipo</th>
+                                    <th>Bloques</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="log-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= VISTA 2: DASHBOARD M/M/1/K ========================= -->
+<div id="vista2" class="view-container">
+    <!-- Botones rápidos -->
+    <div style="margin-bottom: 1rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <button id="btn-sistema-actual" class="btn btn-primary">🔄 Restablecer Sistema Actual (3 Cargueros)</button>
+        <button id="btn-5-cargueros" class="btn btn-success">🚀 Probar con 5 Cargueros</button>
+    </div>
+
+    <!-- Tarjetas de indicadores -->
+    <div class="cards-row">
+        <div class="card-indicator">
+            <div class="card-label">Tasa de Llegada (λ)</div>
+            <div class="card-value" id="card-lambda">—</div>
+            <div class="card-unit">camiones/hora</div>
+        </div>
+        <div class="card-indicator accent">
+            <div class="card-label">Tasa de Servicio (μ)</div>
+            <div class="card-value" id="card-mu">—</div>
+            <div class="card-unit">camiones/hora</div>
+        </div>
+        <div class="card-indicator danger">
+            <div class="card-label">Factor ρ = λ/μ</div>
+            <div class="card-value" id="card-rho">—</div>
+            <div class="card-unit">congestión</div>
+        </div>
+        <div class="card-indicator danger">
+            <div class="card-label">% Pérdida P_K</div>
+            <div class="card-value" id="card-pk">—</div>
+            <div class="card-unit">bloqueo</div>
+        </div>
+        <div class="card-indicator success">
+            <div class="card-label">Tasa Efectiva (λ_ef)</div>
+            <div class="card-value" id="card-lambdaef">—</div>
+            <div class="card-unit">camiones/hora</div>
+        </div>
+        <div class="card-indicator info">
+            <div class="card-label">Espera en Fila (Wq)</div>
+            <div class="card-value" id="card-wq">—</div>
+            <div class="card-unit">promedio</div>
+        </div>
+    </div>
+
+    <!-- Sliders de parámetros -->
+    <div class="panel" style="margin-bottom:1rem;">
+        <div class="panel-header">⚙️ Parámetros del Modelo</div>
+        <div class="panel-body">
+            <div class="slider-group">
+                <label>N.º Cargueros (m):</label>
+                <input type="range" id="v2-cargueros" min="1" max="10" step="1" value="3">
+                <span class="slider-value" id="v2-cargueros-val">3</span>
+            </div>
+            <div class="slider-group">
+                <label>Tiempo Servicio T_s (min):</label>
+                <input type="range" id="v2-ts" min="10" max="200" step="0.01" value="84.67">
+                <span class="slider-value" id="v2-ts-val">84.67</span>
+            </div>
+            <div class="slider-group">
+                <label>Total Llegadas / día:</label>
+                <input type="range" id="v2-llegadas" min="1" max="50" step="1" value="20">
+                <span class="slider-value" id="v2-llegadas-val">20</span>
+            </div>
+            <div class="slider-group">
+                <label>Jornada Efectiva H_ef (h):</label>
+                <input type="range" id="v2-hef" min="1" max="12" step="0.5" value="9">
+                <span class="slider-value" id="v2-hef-val">9</span>
+            </div>
+            <div class="slider-group">
+                <label>Capacidad del Sistema (K):</label>
+                <input type="range" id="v2-k" min="2" max="20" step="1" value="6">
+                <span class="slider-value" id="v2-k-val">6</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-layout">
+        <!-- Tabla de variables -->
+        <div class="panel">
+            <div class="panel-header">📋 Variables del Modelo M/M/1/K</div>
+            <div class="panel-body" style="padding:0;">
+                <div class="table-wrapper">
+                    <table class="variables-table">
+                        <tbody id="v2-variables-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico de distribución -->
+        <div class="panel">
+            <div class="panel-header">📊 Distribución de Probabilidades P(n)</div>
+            <div class="panel-body">
+                <canvas id="v2-chart-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= VISTA 3: INSTRUMENTO DE DATOS ========================= -->
+<div id="vista3" class="view-container">
+    <div class="instrumento-full" style="margin-bottom:1rem;">
+        <div class="panel">
+            <div class="panel-header">📝 Tabla de Pedidos — Instrumento de Entrada de Datos (Visita Empresarial 20/10/2026)</div>
+            <div class="panel-body" style="padding:0;">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Camión #</th>
+                                <th>Tipo de Vehículo</th>
+                                <th>Cantidad de Bloques (Q_i)</th>
+                                <th>N.º Cargueros</th>
+                                <th>T_s Calculado (min)</th>
+                                <th>Eliminar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="instrumento-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="instrumento-table-actions" style="padding:0.75rem;">
+                    <button id="btn-agregar-camion" class="btn btn-primary">+ Agregar Camión</button>
+                    <button id="btn-cargar-sim3d" class="btn btn-success">📦 Cargar estos datos en la Simulación 3D</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjetas de resumen Vista 3 -->
+    <div class="cards-row">
+        <div class="card-indicator">
+            <div class="card-label">Tasa de Llegada (λ)</div>
+            <div class="card-value" id="v3-card-lambda">—</div>
+            <div class="card-unit">camiones/hora</div>
+        </div>
+        <div class="card-indicator accent">
+            <div class="card-label">Tasa de Servicio (μ)</div>
+            <div class="card-value" id="v3-card-mu">—</div>
+            <div class="card-unit">camiones/hora</div>
+        </div>
+        <div class="card-indicator danger">
+            <div class="card-label">Factor ρ = λ/μ</div>
+            <div class="card-value" id="v3-card-rho">—</div>
+            <div class="card-unit">congestión</div>
+        </div>
+        <div class="card-indicator danger">
+            <div class="card-label">% Pérdida P_K</div>
+            <div class="card-value" id="v3-card-pk">—</div>
+            <div class="card-unit">bloqueo</div>
+        </div>
+        <div class="card-indicator success">
+            <div class="card-label">Tasa Efectiva (λ_ef)</div>
+            <div class="card-value" id="v3-card-lambdaef">—</div>
+            <div class="card-unit">camiones/hora</div>
+        </div>
+        <div class="card-indicator info">
+            <div class="card-label">Espera en Fila (Wq)</div>
+            <div class="card-value" id="v3-card-wq">—</div>
+            <div class="card-unit">promedio</div>
+        </div>
+    </div>
+
+    <div class="instrumento-layout">
+        <!-- Tabla de variables Vista 3 -->
+        <div class="panel">
+            <div class="panel-header">📋 Variables del Modelo M/M/1/K (Instrumento)</div>
+            <div class="panel-body" style="padding:0;">
+                <div class="table-wrapper">
+                    <table class="variables-table">
+                        <tbody id="v3-variables-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico distribución Vista 3 -->
+        <div class="panel">
+            <div class="panel-header">📊 Distribución de Probabilidades P(n)</div>
+            <div class="panel-body">
+                <canvas id="v3-chart-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= VISTA 4: FÓRMULAS DEL CÓDIGO ========================= -->
+<div id="vista4" class="view-container">
+    <div class="code-view">
+        <h2 style="color:var(--color-primary-dark); margin-bottom:0.5rem;">📐 Fórmulas Matemáticas Implementadas en el Código</h2>
+        <p style="color:var(--color-text-secondary); margin-bottom:1.5rem;">
+            Sustentación del modelo M/M/1/K programado en JavaScript ES6 — Archivo: <code>js/math/mm1kEngine.js</code>
+        </p>
+
+        <div class="code-section-title">1. Tiempo de Servicio — calcularTiempoPorPedido(bloques, cargueros)</div>
+        <div class="code-block"><span class="comment">// ============================================================================</span>
+<span class="comment">// ECUACIÓN DEL TIEMPO DE CARGUE (SERVICIO) POR PEDIDO</span>
+<span class="comment">// ============================================================================</span>
+<span class="comment">// Ecuación base obtenida por medición directa en campo con m = 3 cargueros:</span>
+<span class="comment">//   T_s(Q_i) = 0.04 × Q_i − 10   (en minutos)</span>
+<span class="comment">//</span>
+<span class="comment">// Escalamiento por número de cargueros (m):</span>
+<span class="comment">//   T_s(Q_i, m) = (3 / m) × (0.04 × Q_i − 10)   (en minutos)</span>
+<span class="comment">//</span>
+<span class="comment">// Ejemplo con m = 5:</span>
+<span class="comment">//   T_s = (3/5) × (0.04 × Q_i − 10) = 0.024 × Q_i − 6</span>
+<span class="comment">//</span>
+<span class="comment">// VALIDACIÓN: Q_i mínimo = 1000 bloques (evita tiempos negativos)</span>
+<span class="comment">// ============================================================================</span>
+
+<span class="keyword">export function</span> <span class="function">calcularTiempoPorPedido</span>(bloques, cargueros) {
+    <span class="keyword">const</span> Q = Math.<span class="function">max</span>(<span class="number">1000</span>, bloques);    <span class="comment">// Validación: mín 1000 bloques</span>
+    <span class="keyword">const</span> m = Math.<span class="function">max</span>(<span class="number">1</span>, cargueros);       <span class="comment">// Validación: mín 1 carguero</span>
+    <span class="keyword">const</span> Ts = (<span class="number">3</span> / m) <span class="operator">*</span> (<span class="number">0.04</span> <span class="operator">*</span> Q <span class="operator">-</span> <span class="number">10</span>);   <span class="comment">// Ecuación escalada por m</span>
+    <span class="keyword">return</span> Math.<span class="function">max</span>(<span class="number">0</span>, Ts);                <span class="comment">// Nunca negativo</span>
+}</div>
+
+        <div class="code-section-title">2. Variables de Estado Estable — calcularVariablesMM1K({...})</div>
+        <div class="code-block"><span class="comment">// ============================================================================</span>
+<span class="comment">// MOTOR MATEMÁTICO DEL MODELO DE COLAS M/M/1/K</span>
+<span class="comment">// ============================================================================</span>
+<span class="comment">// Parámetros de entrada:</span>
+<span class="comment">//   totalLlegadas  → Total de camiones que llegan en el día</span>
+<span class="comment">//   horasEfectivas → Jornada laboral efectiva H_ef (horas)</span>
+<span class="comment">//   tiempoServicioMin → Tiempo medio de servicio T_s (minutos)</span>
+<span class="comment">//   capacidadK     → Capacidad máxima del sistema K</span>
+<span class="comment">// ============================================================================</span>
+
+<span class="keyword">export function</span> <span class="function">calcularVariablesMM1K</span>({ totalLlegadas, horasEfectivas, tiempoServicioMin, capacidadK }) {
+
+    <span class="comment">// 1. Tasa media de llegada λ = Total_Llegadas / H_ef</span>
+    <span class="keyword">const</span> lambda = totalLlegadas / horasEfectivas;           <span class="comment">// cam/hora</span>
+
+    <span class="comment">// 2. Tiempo medio entre llegadas</span>
+    <span class="keyword">const</span> T_a_h = <span class="number">1</span> / lambda;                                <span class="comment">// horas</span>
+    <span class="keyword">const</span> T_a_min = T_a_h <span class="operator">*</span> <span class="number">60</span>;                              <span class="comment">// minutos</span>
+
+    <span class="comment">// 3. Tasa media de servicio μ = 60 / T_s_min</span>
+    <span class="keyword">const</span> mu = <span class="number">60</span> / tiempoServicioMin;                       <span class="comment">// cam/hora</span>
+
+    <span class="comment">// 4. Tiempo medio de servicio</span>
+    <span class="keyword">const</span> T_s_h = tiempoServicioMin / <span class="number">60</span>;                    <span class="comment">// horas</span>
+
+    <span class="comment">// 7. Factor de utilización ρ = λ / μ</span>
+    <span class="keyword">const</span> rho = lambda / mu;
+
+    <span class="comment">// 8. Probabilidad de servidor vacío P₀</span>
+    <span class="keyword">let</span> P_0;
+    <span class="keyword">if</span> (Math.<span class="function">abs</span>(rho <span class="operator">-</span> <span class="number">1</span>) <span class="operator">&lt;</span> <span class="number">1e-10</span>) {
+        P_0 = <span class="number">1</span> / (capacidadK <span class="operator">+</span> <span class="number">1</span>);                        <span class="comment">// Caso ρ = 1</span>
+    } <span class="keyword">else</span> {
+        P_0 = (<span class="number">1</span> <span class="operator">-</span> rho) / (<span class="number">1</span> <span class="operator">-</span> Math.<span class="function">pow</span>(rho, capacidadK <span class="operator">+</span> <span class="number">1</span>));  <span class="comment">// Caso general</span>
+    }
+
+    <span class="comment">// 9. Distribución: P_n = P₀ × ρⁿ   para n = 0, 1, ..., K</span>
+    <span class="keyword">const</span> distribucionPn = [];
+    <span class="keyword">for</span> (<span class="keyword">let</span> n = <span class="number">0</span>; n <span class="operator">&lt;=</span> capacidadK; n++) {
+        <span class="keyword">const</span> P_n = P_0 <span class="operator">*</span> Math.<span class="function">pow</span>(rho, n);
+        distribucionPn.<span class="function">push</span>({ n, P_n, porcentaje: P_n <span class="operator">*</span> <span class="number">100</span> });
+    }
+
+    <span class="comment">// 10. Probabilidad de bloqueo P_K = P₀ × ρᴷ</span>
+    <span class="keyword">const</span> P_K = distribucionPn[capacidadK].P_n;
+
+    <span class="comment">// 11. Tasa efectiva λ_ef = λ × (1 − P_K)</span>
+    <span class="keyword">const</span> lambda_ef = lambda <span class="operator">*</span> (<span class="number">1</span> <span class="operator">-</span> P_K);
+
+    <span class="comment">// 12. Despacho diario = λ_ef × H_ef</span>
+    <span class="keyword">const</span> despacho = lambda_ef <span class="operator">*</span> horasEfectivas;
+
+    <span class="comment">// 13. Camiones promedio en el sistema L</span>
+    <span class="keyword">let</span> L;
+    <span class="keyword">if</span> (Math.<span class="function">abs</span>(rho <span class="operator">-</span> <span class="number">1</span>) <span class="operator">&lt;</span> <span class="number">1e-10</span>) {
+        L = capacidadK / <span class="number">2</span>;
+    } <span class="keyword">else</span> {
+        L = (rho / (<span class="number">1</span> <span class="operator">-</span> rho))
+          <span class="operator">-</span> ((capacidadK <span class="operator">+</span> <span class="number">1</span>) <span class="operator">*</span> Math.<span class="function">pow</span>(rho, capacidadK <span class="operator">+</span> <span class="number">1</span>))
+            / (<span class="number">1</span> <span class="operator">-</span> Math.<span class="function">pow</span>(rho, capacidadK <span class="operator">+</span> <span class="number">1</span>));
+    }
+
+    <span class="comment">// 14. Camiones promedio en la fila L_q = L − (1 − P₀)</span>
+    <span class="keyword">const</span> L_q = L <span class="operator">-</span> (<span class="number">1</span> <span class="operator">-</span> P_0);
+
+    <span class="comment">// 15. Tiempo promedio en el sistema W = L / λ_ef</span>
+    <span class="keyword">const</span> W_h = L / lambda_ef;                              <span class="comment">// horas</span>
+    <span class="keyword">const</span> W_min = W_h <span class="operator">*</span> <span class="number">60</span>;                                 <span class="comment">// minutos</span>
+
+    <span class="comment">// 16. Tiempo promedio en la fila W_q = L_q / λ_ef</span>
+    <span class="keyword">const</span> W_q_h = L_q / lambda_ef;                           <span class="comment">// horas</span>
+    <span class="keyword">const</span> W_q_min = W_q_h <span class="operator">*</span> <span class="number">60</span>;                              <span class="comment">// minutos</span>
+
+    <span class="keyword">return</span> {
+        lambda, T_a_h, T_a_min, mu, T_s_h, rho,
+        P_0, distribucionPn, P_K,
+        lambda_ef, despacho, L, L_q,
+        W_h, W_min, W_q_h, W_q_min,
+        H_ef: horasEfectivas, T_s_min: tiempoServicioMin,
+        c: <span class="number">1</span>, K: capacidadK, totalLlegadas
+    };
+}</div>
+
+        <div class="code-section-title">3. Resumen de las Fórmulas Aplicadas</div>
+        <div class="panel" style="margin-top:0.5rem;">
+            <div class="panel-body" style="padding:0;">
+                <table class="variables-table">
+                    <thead>
+                        <tr>
+                            <th style="background:var(--color-primary-dark);color:#fff;padding:0.5rem 0.75rem;">Concepto</th>
+                            <th style="background:var(--color-primary-dark);color:#fff;padding:0.5rem 0.75rem;">Fórmula</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>T_s(Q_i, m)</td><td>(3 / m) × (0.04 × Q_i − 10) min</td></tr>
+                        <tr><td>λ (Tasa de llegada)</td><td>Total_Llegadas / H_ef</td></tr>
+                        <tr><td>μ (Tasa de servicio)</td><td>60 / T_s_min</td></tr>
+                        <tr><td>ρ (Factor de utilización)</td><td>λ / μ</td></tr>
+                        <tr><td>P₀ (Servidor vacío)</td><td>(1 − ρ) / (1 − ρ^(K+1)) si ρ ≠ 1 ‖ 1/(K+1) si ρ = 1</td></tr>
+                        <tr><td>P_n (Distribución)</td><td>P₀ × ρⁿ para n = 0, 1, ..., K</td></tr>
+                        <tr><td>P_K (Bloqueo)</td><td>P₀ × ρᴷ</td></tr>
+                        <tr><td>λ_ef (Tasa efectiva)</td><td>λ × (1 − P_K)</td></tr>
+                        <tr><td>Despacho diario</td><td>λ_ef × H_ef</td></tr>
+                        <tr><td>L (Promedio en sistema)</td><td>ρ/(1−ρ) − (K+1)×ρ^(K+1) / (1−ρ^(K+1))</td></tr>
+                        <tr><td>Lq (Promedio en fila)</td><td>L − (1 − P₀)</td></tr>
+                        <tr><td>W (Tiempo en sistema)</td><td>L / λ_ef</td></tr>
+                        <tr><td>Wq (Tiempo en fila)</td><td>Lq / λ_ef</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================= SCRIPT PRINCIPAL (MODULE) ========================= -->
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
